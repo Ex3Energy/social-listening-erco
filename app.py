@@ -1,27 +1,69 @@
 
+import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
-import pandas as pd
+from datetime import datetime
+import instaloader
 
-st.title("ERCO Social Listening Dashboard")
+# Lista de cuentas a monitorear
+INSTAGRAM_USERS = [
+    "ercoenergia",
+    "epmestamosahi",
+    "celsia_energia",
+    "vatiaenergia",
+    "enelxcolombia",
+    "grupobia_col"
+]
 
-# Datos de ejemplo
-data = {
-    'Fecha': ['2023-01', '2023-02', '2023-03', '2023-04'],
-    'Menciones': [120, 150, 170, 130],
-    'Sentimiento Positivo (%)': [70, 75, 80, 78]
-}
+# Función de scraping
+def scrape_instagram_profiles():
+    loader = instaloader.Instaloader()
+    data = []
 
-df = pd.DataFrame(data)
+    for username in INSTAGRAM_USERS:
+        try:
+            profile = instaloader.Profile.from_username(loader.context, username)
+            data.append({
+                "Cuenta": username,
+                "Seguidores": profile.followers,
+                "Fecha": datetime.today().strftime('%Y-%m-%d')
+            })
+        except Exception as e:
+            data.append({
+                "Cuenta": username,
+                "Seguidores": None,
+                "Fecha": datetime.today().strftime('%Y-%m-%d'),
+                "Error": str(e)
+            })
+
+    df = pd.DataFrame(data)
+    df.to_csv("instagram_data.csv", index=False)
+    return df
+
+# Dashboard
+st.set_page_config(page_title="ERCO Social Listening", layout="wide")
+st.title("📱 Seguidores en Instagram - ERCO y Competidores")
+
+# Botón de actualización
+if st.button("Actualizar seguidores desde Instagram"):
+    df = scrape_instagram_profiles()
+    st.success("✅ Seguidores actualizados correctamente.")
+else:
+    try:
+        df = pd.read_csv("instagram_data.csv")
+    except:
+        st.warning("⚠️ Aún no se han cargado datos. Presiona el botón para iniciar.")
+        df = pd.DataFrame(columns=["Cuenta", "Seguidores", "Fecha"])
 
 # Mostrar tabla
-st.subheader("Resumen de Menciones y Sentimiento")
-st.dataframe(df)
+if not df.empty:
+    st.subheader("📊 Tabla de Seguidores")
+    st.dataframe(df)
 
-# Gráfica
-st.subheader("Tendencia de Menciones")
-fig, ax = plt.subplots()
-ax.plot(df['Fecha'], df['Menciones'], marker='o')
-ax.set_xlabel("Fecha")
-ax.set_ylabel("Menciones")
-st.pyplot(fig)
+    st.subheader("📉 Comparación de Seguidores")
+    fig, ax = plt.subplots()
+    ax.bar(df["Cuenta"], df["Seguidores"], color='skyblue')
+    plt.xticks(rotation=45)
+    plt.ylabel("Seguidores")
+    st.pyplot(fig)
+
