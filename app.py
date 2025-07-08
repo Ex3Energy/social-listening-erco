@@ -1,69 +1,60 @@
 
-import pandas as pd
 import streamlit as st
+import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
 import instaloader
 
-# Lista de cuentas a monitorear
-INSTAGRAM_USERS = [
-    "ercoenergia",
-    "epmestamosahi",
-    "celsia_energia",
-    "vatiaenergia",
-    "enelxcolombia",
-    "grupobia_col"
-]
+st.set_page_config(page_title="ERCO Social Listening Dashboard", layout="wide")
+st.title("ERCO Social Listening Dashboard")
 
-# Función de scraping
-def scrape_instagram_profiles():
-    loader = instaloader.Instaloader()
-    data = []
+# Simulamos menciones y sentimiento
+data = {
+    "Fecha": ["2023-01", "2023-02", "2023-03", "2023-04"],
+    "Menciones": [120, 150, 170, 130],
+    "Sentimiento Positivo (%)": [70, 75, 80, 78]
+}
+df_sentimiento = pd.DataFrame(data)
+st.subheader("Resumen de Menciones y Sentimiento")
+st.dataframe(df_sentimiento)
 
-    for username in INSTAGRAM_USERS:
+# Tendencia
+st.subheader("Tendencia de Menciones")
+fig1, ax1 = plt.subplots()
+ax1.plot(df_sentimiento["Fecha"], df_sentimiento["Menciones"], marker="o")
+plt.ylabel("Menciones")
+st.pyplot(fig1)
+
+# Scraping Instagram (manual)
+st.subheader("Seguidores en Instagram (actualización manual)")
+
+if st.button("Actualizar Seguidores"):
+    cuentas = ["ercoenergia", "celsia_energia", "enelcolombia", "empgrupoepm", "vatiaenergia"]
+    L = instaloader.Instaloader()
+    seguidores = []
+    for cuenta in cuentas:
         try:
-            profile = instaloader.Profile.from_username(loader.context, username)
-            data.append({
-                "Cuenta": username,
-                "Seguidores": profile.followers,
-                "Fecha": datetime.today().strftime('%Y-%m-%d')
-            })
+            perfil = instaloader.Profile.from_username(L.context, cuenta)
+            seguidores.append(perfil.followers)
         except Exception as e:
-            data.append({
-                "Cuenta": username,
-                "Seguidores": None,
-                "Fecha": datetime.today().strftime('%Y-%m-%d'),
-                "Error": str(e)
-            })
+            seguidores.append(None)
+    df = pd.DataFrame({
+        "Cuenta": cuentas,
+        "Seguidores": seguidores
+    })
 
-    df = pd.DataFrame(data)
-    df.to_csv("instagram_data.csv", index=False)
-    return df
-
-# Dashboard
-st.set_page_config(page_title="ERCO Social Listening", layout="wide")
-st.title("📱 Seguidores en Instagram - ERCO y Competidores")
-
-# Botón de actualización
-if st.button("Actualizar seguidores desde Instagram"):
-    df = scrape_instagram_profiles()
-    st.success("✅ Seguidores actualizados correctamente.")
-else:
-    try:
-        df = pd.read_csv("instagram_data.csv")
-    except:
-        st.warning("⚠️ Aún no se han cargado datos. Presiona el botón para iniciar.")
-        df = pd.DataFrame(columns=["Cuenta", "Seguidores", "Fecha"])
-
-# Mostrar tabla
-if not df.empty:
-    st.subheader("📊 Tabla de Seguidores")
     st.dataframe(df)
 
-    st.subheader("📉 Comparación de Seguidores")
-    fig, ax = plt.subplots()
-    ax.bar(df["Cuenta"], df["Seguidores"], color='skyblue')
-    plt.xticks(rotation=45)
-    plt.ylabel("Seguidores")
-    st.pyplot(fig)
+    # Limpiar valores nulos o no numéricos
+    df_clean = df[pd.to_numeric(df["Seguidores"], errors='coerce').notnull()]
+    df_clean["Seguidores"] = df_clean["Seguidores"].astype(int)
+
+    # Verificamos si hay datos válidos
+    if not df_clean.empty:
+        fig, ax = plt.subplots()
+        ax.bar(df_clean["Cuenta"], df_clean["Seguidores"], color='skyblue')
+        plt.xticks(rotation=45)
+        plt.ylabel("Seguidores")
+        st.pyplot(fig)
+    else:
+        st.warning("No hay datos válidos para graficar seguidores.")
 
