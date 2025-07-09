@@ -1,60 +1,83 @@
 
 import streamlit as st
+import instaloader
+import os
+from dotenv import load_dotenv
 import pandas as pd
 import matplotlib.pyplot as plt
-import instaloader
 
-st.set_page_config(page_title="ERCO Social Listening Dashboard", layout="wide")
+# Cargar variables de entorno (credenciales)
+load_dotenv()
+USERNAME = os.getenv("INSTA_USER")
+PASSWORD = os.getenv("INSTA_PASS")
+
+# -------------------------------
+# Configuración general del app
+# -------------------------------
+st.set_page_config(page_title="ERCO Social Listening", layout="wide")
 st.title("ERCO Social Listening Dashboard")
 
-# Simulamos menciones y sentimiento
+# -------------------------------
+# Módulo 1: Datos simulados históricos
+# -------------------------------
+st.subheader("Resumen de Menciones y Sentimiento")
+
+# Datos de ejemplo (simulados)
 data = {
     "Fecha": ["2023-01", "2023-02", "2023-03", "2023-04"],
     "Menciones": [120, 150, 170, 130],
     "Sentimiento Positivo (%)": [70, 75, 80, 78]
 }
-df_sentimiento = pd.DataFrame(data)
-st.subheader("Resumen de Menciones y Sentimiento")
-st.dataframe(df_sentimiento)
+df = pd.DataFrame(data)
+st.dataframe(df)
 
-# Tendencia
+# Gráfica de tendencia de menciones
 st.subheader("Tendencia de Menciones")
 fig1, ax1 = plt.subplots()
-ax1.plot(df_sentimiento["Fecha"], df_sentimiento["Menciones"], marker="o")
-plt.ylabel("Menciones")
+ax1.plot(df["Fecha"], df["Menciones"], marker="o", linestyle="-")
+ax1.set_xlabel("Fecha")
+ax1.set_ylabel("Menciones")
 st.pyplot(fig1)
 
-# Scraping Instagram (manual)
+# -------------------------------
+# Módulo 2: Seguidores de Instagram con login
+# -------------------------------
 st.subheader("Seguidores en Instagram (actualización manual)")
 
-if st.button("Actualizar Seguidores"):
-    cuentas = ["ercoenergia", "celsia_energia", "enelcolombia", "empgrupoepm", "vatiaenergia"]
+# Cuentas a monitorear
+cuentas_instagram = ["ercoenergia", "celsia_energia", "enelcolombia", "empgrupoepm", "vatiaenergia"]
+
+@st.cache_data(show_spinner="Conectando a Instagram...", ttl=3600)
+def obtener_seguidores(cuentas):
     L = instaloader.Instaloader()
+    try:
+        L.login(USERNAME, PASSWORD)
+    except Exception as e:
+        st.error(f"Error al iniciar sesión en Instagram: {e}")
+        return pd.DataFrame()
+
     seguidores = []
     for cuenta in cuentas:
         try:
             perfil = instaloader.Profile.from_username(L.context, cuenta)
-            seguidores.append(perfil.followers)
+            seguidores.append({"Cuenta": cuenta, "Seguidores": perfil.followers})
         except Exception as e:
-            seguidores.append(None)
-    df = pd.DataFrame({
-        "Cuenta": cuentas,
-        "Seguidores": seguidores
-    })
+            seguidores.append({"Cuenta": cuenta, "Seguidores": None})
+            st.warning(f"No se pudo acceder a @{cuenta}: {e}")
 
-    st.dataframe(df)
+    return pd.DataFrame(seguidores)
 
-    # Limpiar valores nulos o no numéricos
-    df_clean = df[pd.to_numeric(df["Seguidores"], errors='coerce').notnull()]
-    df_clean["Seguidores"] = df_clean["Seguidores"].astype(int)
+# Botón manual para actualizar
+if st.button("Actualizar Seguidores"):
+    df_seguidores = obtener_seguidores(cuentas_instagram)
+    st.dataframe(df_seguidores)
 
-    # Verificamos si hay datos válidos
-    if not df_clean.empty:
-        fig, ax = plt.subplots()
-        ax.bar(df_clean["Cuenta"], df_clean["Seguidores"], color='skyblue')
-        plt.xticks(rotation=45)
-        plt.ylabel("Seguidores")
-        st.pyplot(fig)
+    if not df_seguidores["Seguidores"].isnull().all():
+        fig2, ax2 = plt.subplots()
+        ax2.bar(df_seguidores["Cuenta"], df_seguidores["Seguidores"], color="mediumseagreen")
+        ax2.set_ylabel("Seguidores")
+        ax2.set_title("Comparativo de Seguidores en Instagram")
+        st.pyplot(fig2)
     else:
         st.warning("No hay datos válidos para graficar seguidores.")
 
