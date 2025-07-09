@@ -72,7 +72,7 @@ if st.button("Actualizar Seguidores"):
     df_seguidores = obtener_seguidores(cuentas_instagram)
     st.dataframe(df_seguidores)
 
-    if not df_seguidores["Seguidores"].isnull().all():
+    if "Seguidores" in df_seguidores.columns and not df_seguidores["Seguidores"].isnull().all():
         fig2, ax2 = plt.subplots()
         ax2.bar(df_seguidores["Cuenta"], df_seguidores["Seguidores"], color="mediumseagreen")
         ax2.set_ylabel("Seguidores")
@@ -80,4 +80,3 @@ if st.button("Actualizar Seguidores"):
         st.pyplot(fig2)
     else:
         st.warning("No hay datos válidos para graficar seguidores.")
-
